@@ -16,8 +16,6 @@ package svg
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
 	"os/exec"
 
 	"github.com/gohugoio/hugo/common/herrors"
@@ -86,7 +84,9 @@ func (t *svgTransformation) Transform(ctx *resources.ResourceTransformationCtx) 
 		return herrors.ErrFeatureNotAvailable
 	}
 
+	ctx.InMediaType = media.SVGType
 	ctx.OutMediaType = media.PNGType
+
 	if t.options.TargetPath != "" {
 		ctx.OutPath = t.options.TargetPath
 	} else {
@@ -109,45 +109,27 @@ func (t *svgTransformation) Transform(ctx *resources.ResourceTransformationCtx) 
 		cmdArgs = append(cmdArgs, optArgs...)
 	}
 
-	// create temp files for input and output
-	tempInput, err := ioutil.TempFile("", "hugo-svg-in*.svg")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tempInput.Name())
+	cmdArgs = append(cmdArgs, "-e", "-")
+	cmdArgs = append(cmdArgs, "-")
 
-	tempOutput, err := ioutil.TempFile("", "hugo-svg-out*.png")
-	if err != nil {
-		return err
-	}
-	_ = tempOutput.Close()
-	defer os.Remove(tempOutput.Name())
-
-	if _, err = io.Copy(tempInput, ctx.From); err != nil {
-		return err
-	}
-	_ = tempInput.Close()
-
-	cmdArgs = append(cmdArgs, "-e", tempOutput.Name())
-	cmdArgs = append(cmdArgs, tempInput.Name())
-
-	//fmt.Printf("svg exec %v, source %s\n", cmdArgs, ctx.SourcePath)
 	cmd := exec.Command(binaryName, cmdArgs...)
+	cmd.Stdout = ctx.To
 	//cmd.Stderr = os.Stderr
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer stdin.Close()
+		io.Copy(stdin, ctx.From)
+	}()
 
 	err = cmd.Run()
 	if err != nil {
-		//fmt.Printf("svg failed, %s\n", string(err.(*exec.ExitError).Stderr))
 		return err
 	}
-
-	tempOutputName, err := os.Open(tempOutput.Name())
-	if err != nil {
-		return err
-	}
-	defer tempOutputName.Close()
-	_, _ = io.Copy(ctx.To, tempOutputName)
-
 	return nil
 }
 
