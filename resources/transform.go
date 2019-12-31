@@ -51,8 +51,9 @@ var (
 // be available when building the theme/site so we write the transformation
 // result to disk and reuse if needed for these,
 var transformationsToCacheOnDisk = map[string]bool{
-	"postcss": true,
-	"tocss":   true,
+	"postcss":  true,
+	"tocss":    true,
+	"svgToPng": true,
 }
 
 func newResourceAdapter(spec *Spec, lazyPublish bool, target transformableResource) *resourceAdapter {

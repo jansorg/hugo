@@ -65,6 +65,11 @@ func init() {
 			[][2]string{},
 		)
 
+		ns.AddMethodMapping(ctx.SVGToPNG,
+			[]string{"svgToPng"},
+			[][2]string{},
+		)
+
 		return ns
 
 	}

@@ -27,6 +27,8 @@ import (
 	"github.com/gohugoio/hugo/deps"
 	"github.com/gohugoio/hugo/resources"
 	"github.com/gohugoio/hugo/resources/resource"
+	"github.com/gohugoio/hugo/resources/resource_transformers/svg"
+	_errors "github.com/pkg/errors"
 
 	"github.com/gohugoio/hugo/resources/resource_factories/bundler"
 	"github.com/gohugoio/hugo/resources/resource_factories/create"
@@ -65,6 +67,7 @@ func New(deps *deps.Deps) (*Namespace, error) {
 		postcssClient:   postcss.New(deps.ResourceSpec),
 		templatesClient: templates.New(deps.ResourceSpec, deps),
 		babelClient:     babel.New(deps.ResourceSpec),
+		svgClient:       svg.New(deps.BaseFs.Assets, deps.ResourceSpec),
 	}, nil
 }
 
@@ -80,6 +83,7 @@ type Namespace struct {
 	postcssClient   *postcss.Client
 	babelClient     *babel.Client
 	templatesClient *templates.Client
+	svgClient       *svg.Client
 }
 
 // Get locates the filename given in Hugo's assets filesystem
@@ -260,6 +264,24 @@ func (ns *Namespace) ToCSS(args ...interface{}) (resource.Resource, error) {
 	}
 
 	return ns.scssClient.ToCSS(r, options)
+}
+
+// SVGToPNG converts an SVG input file to a PNG file using inkscape
+func (ns *Namespace) SVGToPNG(args ...interface{}) (resource.Resource, error) {
+	r, m, err := ns.resolveArgs(args)
+	if err != nil {
+		return nil, err
+	}
+
+	var options svg.Options
+	if m != nil {
+		options, err = svg.DecodeOptions(m)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ns.svgClient.Process(r, options)
 }
 
 // PostCSS processes the given Resource with PostCSS
