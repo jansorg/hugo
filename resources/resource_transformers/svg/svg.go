@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strconv"
 
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/hugolib/filesystems"
@@ -29,9 +30,12 @@ import (
 
 // Some of the options from https://inkscape.org/en/doc/inkscape-man.html#OPTIONS
 type Options struct {
-	TargetPath string
-	Width      string
-	Height     string
+	TargetPath     string
+	Width          int
+	Height         int
+	ElementID      string
+	ExportArea     string
+	ExportAreaSnap bool
 }
 
 func DecodeOptions(m map[string]interface{}) (opts Options, err error) {
@@ -44,11 +48,26 @@ func DecodeOptions(m map[string]interface{}) (opts Options, err error) {
 
 func (opts Options) toArgs() []string {
 	var args []string
-	if opts.Width != "" {
-		args = append(args, "-w", opts.Width)
+	if opts.Width != 0 {
+		args = append(args, "-w", strconv.Itoa(opts.Width))
 	}
-	if opts.Height != "" {
-		args = append(args, "-h", opts.Height)
+	if opts.Height != 0 {
+		args = append(args, "-h", strconv.Itoa(opts.Height))
+	}
+	if opts.ElementID != "" {
+		args = append(args, "-i", opts.ElementID)
+	}
+	if opts.ExportArea != "" {
+		if opts.ExportArea == "page" {
+			args = append(args, "--export-area-page")
+		} else if opts.ExportArea == "drawing" {
+			args = append(args, "--export-area-drawing")
+		} else {
+			args = append(args, fmt.Sprintf("--export-area=%s", opts.ExportArea))
+		}
+	}
+	if opts.ExportAreaSnap {
+		args = append(args, "--export-area-snap")
 	}
 	return args
 }
@@ -90,15 +109,26 @@ func (t *svgTransformation) Transform(ctx *resources.ResourceTransformationCtx) 
 	if t.options.TargetPath != "" {
 		ctx.OutPath = t.options.TargetPath
 	} else {
+		var prefix string
+		if t.options.ElementID != "" {
+			prefix = "_" + t.options.ElementID
+		}
+		if t.options.ExportArea != "" {
+			prefix = "_" + t.options.ExportArea
+		}
+		if t.options.ExportAreaSnap {
+			prefix = "_snap"
+		}
+
 		var ext string
-		if t.options.Width != "" && t.options.Height != "" {
-			ext = fmt.Sprintf("-%sx%s.png", t.options.Width, t.options.Height)
-		} else if t.options.Width != "" {
-			ext = fmt.Sprintf("-%s.png", t.options.Width)
-		} else if t.options.Height != "" {
-			ext = fmt.Sprintf("-%s.png", t.options.Height)
+		if t.options.Width != 0 && t.options.Height != 0 {
+			ext = fmt.Sprintf("%s-%dx%d.png", prefix, t.options.Width, t.options.Height)
+		} else if t.options.Width != 0 {
+			ext = fmt.Sprintf("%s-%d.png", prefix, t.options.Width)
+		} else if t.options.Height != 0 {
+			ext = fmt.Sprintf("%s-%d.png", prefix, t.options.Height)
 		} else {
-			ext = ".png"
+			ext = prefix + ".png"
 		}
 
 		ctx.ReplaceOutPathExtension(ext)
@@ -109,8 +139,8 @@ func (t *svgTransformation) Transform(ctx *resources.ResourceTransformationCtx) 
 		cmdArgs = append(cmdArgs, optArgs...)
 	}
 
+	cmdArgs = append(cmdArgs, "-f", "-")
 	cmdArgs = append(cmdArgs, "-e", "-")
-	cmdArgs = append(cmdArgs, "-")
 
 	cmd := exec.Command(binaryName, cmdArgs...)
 	cmd.Stdout = ctx.To
