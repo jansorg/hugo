@@ -139,8 +139,12 @@ func (t *svgTransformation) Transform(ctx *resources.ResourceTransformationCtx) 
 		cmdArgs = append(cmdArgs, optArgs...)
 	}
 
-	cmdArgs = append(cmdArgs, "-f", "-")
-	cmdArgs = append(cmdArgs, "-e", "-")
+	// read from stdin
+	cmdArgs = append(cmdArgs, "-p")
+	// write png to stdout
+	cmdArgs = append(cmdArgs, "-o", "-")
+	cmdArgs = append(cmdArgs, "--export-type", "png")
+	cmdArgs = append(cmdArgs, "--export-area-snap")
 
 	cmd := exec.Command(binaryName, cmdArgs...)
 	cmd.Stdout = ctx.To
